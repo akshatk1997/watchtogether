@@ -49,8 +49,24 @@ let unsubChat = null;
 let unsubQueue = null;
 let unsubReactions = null;
 let ytPlayer = null;
+let pendingYtId = null;
 let hlsInstance = null;
 let currentMediaUrl = "";
+
+window.onYouTubeIframeAPIReady = () => {
+  if (pendingYtId) {
+    initYtPlayer(pendingYtId);
+    pendingYtId = null;
+  }
+};
+
+function initYtPlayer(videoId) {
+  ytPlayer = new YT.Player("yt-player", {
+    videoId,
+    host: "https://www.youtube-nocookie.com",
+    playerVars: { playsinline: 1, rel: 0, autoplay: 1 }
+  });
+}
 
 // Elements
 const authView = document.getElementById("auth-view");
@@ -435,11 +451,9 @@ function loadPlayer(url) {
     if (ytPlayer && ytPlayer.loadVideoById) {
       ytPlayer.loadVideoById(media.id);
     } else if (window.YT && window.YT.Player) {
-      ytPlayer = new YT.Player("yt-player", {
-        videoId: media.id,
-        host: "https://www.youtube-nocookie.com",
-        playerVars: { playsinline: 1, rel: 0 }
-      });
+      initYtPlayer(media.id);
+    } else {
+      pendingYtId = media.id;
     }
   } else if (media.type === "DRIVE") {
     driveEl.classList.remove("hidden");
@@ -460,6 +474,10 @@ function loadPlayer(url) {
 function syncPlayback(isPlaying, positionMs) {
   if (ytPlayer && ytPlayer.getPlayerState) {
     const state = ytPlayer.getPlayerState();
+    const targetSec = positionMs / 1000;
+    if (ytPlayer.getCurrentTime && Math.abs(ytPlayer.getCurrentTime() - targetSec) > 2.5) {
+      ytPlayer.seekTo(targetSec, true);
+    }
     if (isPlaying && state !== 1) ytPlayer.playVideo();
     if (!isPlaying && state === 1) ytPlayer.pauseVideo();
   }
