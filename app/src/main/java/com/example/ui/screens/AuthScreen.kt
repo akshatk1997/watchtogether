@@ -32,8 +32,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import com.example.R
 import com.example.auth.attemptAutoSignIn
+import com.example.auth.onEmailSignInClicked
 import com.example.auth.onGoogleSignInClicked
 import com.example.auth.onGuestSignInClicked
 import com.example.ui.components.CinematicBackdrop
@@ -74,6 +78,10 @@ fun AuthScreen(
     var checkingSession by remember { mutableStateOf(true) }
     var isSigningIn by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showEmailForm by remember { mutableStateOf(false) }
+    var isEmailSignUp by remember { mutableStateOf(false) }
+    var emailInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         attemptAutoSignIn(
@@ -301,13 +309,10 @@ fun AuthScreen(
                                 errorMessage = null
                                 isSigningIn = true
                                 onGuestSignInClicked(
+                                    context = context,
                                     onAuthSuccess = {
                                         isSigningIn = false
                                         onAuthSuccess()
-                                    },
-                                    onAuthError = { msg ->
-                                        isSigningIn = false
-                                        errorMessage = msg
                                     },
                                     scope = scope
                                 )
@@ -326,6 +331,89 @@ fun AuthScreen(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 fontWeight = FontWeight.SemiBold
                             )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        TextButton(
+                            onClick = {
+                                errorMessage = null
+                                showEmailForm = !showEmailForm
+                            },
+                            enabled = !isSigningIn
+                        ) {
+                            Text(
+                                text = if (showEmailForm) "Hide Email Sign-In" else "Sign in with Email & Password",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        if (showEmailForm) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = emailInput,
+                                onValueChange = { emailInput = it },
+                                label = { Text("Email") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedTextField(
+                                value = passwordInput,
+                                onValueChange = { passwordInput = it },
+                                label = { Text("Password (min 6 chars)") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = {
+                                    errorMessage = null
+                                    isSigningIn = true
+                                    onEmailSignInClicked(
+                                        email = emailInput,
+                                        password = passwordInput,
+                                        isSignUp = isEmailSignUp,
+                                        onAuthSuccess = {
+                                            isSigningIn = false
+                                            onAuthSuccess()
+                                        },
+                                        onAuthError = { msg ->
+                                            isSigningIn = false
+                                            errorMessage = msg
+                                        },
+                                        scope = scope
+                                    )
+                                },
+                                enabled = !isSigningIn,
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                            ) {
+                                Text(
+                                    text = if (isEmailSignUp) "Create Account" else "Sign In with Email",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            TextButton(
+                                onClick = {
+                                    errorMessage = null
+                                    isEmailSignUp = !isEmailSignUp
+                                },
+                                enabled = !isSigningIn
+                            ) {
+                                Text(
+                                    text = if (isEmailSignUp) "Already have an account? Sign In" else "New here? Create an account",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }

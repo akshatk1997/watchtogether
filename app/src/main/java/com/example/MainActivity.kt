@@ -58,6 +58,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.auth.GuestSession
 import com.example.auth.authStateFlow
 import com.example.auth.signOutUser
 import com.example.data.MediaLookupService
@@ -157,18 +158,20 @@ private fun WatchTogetherRoot(
     val auth = Firebase.auth
     val currentUser by auth.authStateFlow()
         .collectAsStateWithLifecycle(initialValue = auth.currentUser)
+    val guestUid by GuestSession.guestUid.collectAsStateWithLifecycle()
 
     val user = currentUser
-    if (user == null) {
+    val activeUid = user?.uid ?: guestUid
+    if (activeUid == null) {
         WatchTogetherTheme(darkTheme = true) {
             AuthScreen(onAuthSuccess = {})
         }
     } else {
-        key(user.uid) {
+        key(activeUid) {
             AuthenticatedWatchTogetherApp(
-                currentUserId = user.uid,
-                userDisplayName = user.displayName ?: "Cinema Fan",
-                userEmail = user.email,
+                currentUserId = activeUid,
+                userDisplayName = user?.displayName ?: if (guestUid != null) "Guest" else "Cinema Fan",
+                userEmail = user?.email,
                 isInPipMode = isInPipMode,
                 pendingRoomCode = pendingRoomCode,
                 onConsumePendingRoomCode = onConsumePendingRoomCode,

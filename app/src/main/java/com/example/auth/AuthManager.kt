@@ -22,10 +22,35 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import java.util.UUID
+
+object GuestSession {
+    private const val PREFS_NAME = "watchtogether_guest"
+    private const val KEY_GUEST_UID = "guest_uid"
+    private val _guestUid = MutableStateFlow<String?>(null)
+    val guestUid: StateFlow<String?> = _guestUid.asStateFlow()
+
+    fun enterGuestMode(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val uid = prefs.getString(KEY_GUEST_UID, null)
+            ?: "guest_${UUID.randomUUID().toString().take(8)}".also {
+                prefs.edit().putString(KEY_GUEST_UID, it).apply()
+            }
+        _guestUid.value = uid
+        return uid
+    }
+
+    fun clearGuestMode() {
+        _guestUid.value = null
+    }
+}
 
 fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
     val listener = FirebaseAuth.AuthStateListener { auth ->
@@ -131,12 +156,12 @@ fun onGoogleSignInClicked(
 }
 
 /**
- * Guest Sign-In using Firebase Anonymous Auth so users can use all WatchTogether features
- * without a Google account (excluding Google-account-linked sync).
+ * Guest Sign-In: tries Firebase Anonymous Auth first, and falls back to a local GuestSession
+ * if Anonymous Auth is disabled in Firebase Console (e.g. ADMIN_ONLY_OPERATION).
  */
 fun onGuestSignInClicked(
+    context: Context,
     onAuthSuccess: () -> Unit,
-    onAuthError: (String) -> Unit,
     scope: CoroutineScope
 ) {
     scope.launch {
@@ -144,10 +169,42 @@ fun onGuestSignInClicked(
             if (Firebase.auth.currentUser == null) {
                 Firebase.auth.signInAnonymously().await()
             }
+        } catch (e: Exception) {
+            Log.w("Auth", "Firebase anonymous auth unavailable, using local guest session: ${e.message}")
+            GuestSession.enterGuestMode(context)
+        }
+        onAuthSuccess()
+    }
+}
+
+/**
+ * Email & Password Sign-In or Sign-Up using Firebase Auth.
+ */
+fun onEmailSignInClicked(
+    email: String,
+    password: String,
+    isSignUp: Boolean,
+    onAuthSuccess: () -> Unit,
+    onAuthError: (String) -> Unit,
+    scope: CoroutineScope
+) {
+    val trimmedEmail = email.trim()
+    if (trimmedEmail.isBlank() || password.length < 6) {
+        onAuthError("Enter a valid email and a password of at least 6 characters.")
+        return
+    }
+    scope.launch {
+        try {
+            if (isSignUp) {
+                Firebase.auth.createUserWithEmailAndPassword(trimmedEmail, password).await()
+            } else {
+                Firebase.auth.signInWithEmailAndPassword(trimmedEmail, password).await()
+            }
+            GuestSession.clearGuestMode()
             onAuthSuccess()
         } catch (e: Exception) {
-            Log.e("Auth", "Guest Sign-In failed", e)
-            onAuthError(e.localizedMessage ?: "Guest sign-in failed. Please try again.")
+            Log.e("Auth", "Email auth failed", e)
+            onAuthError(e.localizedMessage ?: "Email sign-in failed. Please try again.")
         }
     }
 }
@@ -167,6 +224,7 @@ fun signOutUser(
             } catch (e: Exception) {
                 Log.w("Auth", "Failed to clear credential state: ${e.message}")
             } finally {
+                GuestSession.clearGuestMode()
                 Firebase.auth.signOut()
                 onSignOutComplete()
             }
