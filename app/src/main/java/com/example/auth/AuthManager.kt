@@ -131,6 +131,28 @@ fun onGoogleSignInClicked(
 }
 
 /**
+ * Guest Sign-In using Firebase Anonymous Auth so users can use all WatchTogether features
+ * without a Google account (excluding Google-account-linked sync).
+ */
+fun onGuestSignInClicked(
+    onAuthSuccess: () -> Unit,
+    onAuthError: (String) -> Unit,
+    scope: CoroutineScope
+) {
+    scope.launch {
+        try {
+            if (Firebase.auth.currentUser == null) {
+                Firebase.auth.signInAnonymously().await()
+            }
+            onAuthSuccess()
+        } catch (e: Exception) {
+            Log.e("Auth", "Guest Sign-In failed", e)
+            onAuthError(e.localizedMessage ?: "Guest sign-in failed. Please try again.")
+        }
+    }
+}
+
+/**
  * Safe sign-out flow wrapped in NonCancellable to cleanly clear Credential Manager state.
  */
 fun signOutUser(

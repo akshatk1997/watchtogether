@@ -31,6 +31,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,6 +59,7 @@ import androidx.credentials.CredentialManager
 import com.example.R
 import com.example.auth.attemptAutoSignIn
 import com.example.auth.onGoogleSignInClicked
+import com.example.auth.onGuestSignInClicked
 import com.example.ui.components.CinematicBackdrop
 import com.example.ui.components.GlassCard
 
@@ -214,7 +216,7 @@ fun AuthScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Sign in with Google to create synced rooms, share 6-character invites, chat live, and watch YouTube, Drive videos, and free Indian Live TV together.",
+                            text = "Sign in with Google (optional) or continue as a Guest to create synced rooms, share 6-character invites, chat live, and watch YouTube, Drive videos, and free Indian Live TV together.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -290,6 +292,40 @@ fun AuthScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                errorMessage = null
+                                isSigningIn = true
+                                onGuestSignInClicked(
+                                    onAuthSuccess = {
+                                        isSigningIn = false
+                                        onAuthSuccess()
+                                    },
+                                    onAuthError = { msg ->
+                                        isSigningIn = false
+                                        errorMessage = msg
+                                    },
+                                    scope = scope
+                                )
+                            },
+                            enabled = !isSigningIn,
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("guest_sign_in_button")
+                        ) {
+                            Text(
+                                text = "Continue as Guest",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
