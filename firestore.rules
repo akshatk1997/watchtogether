@@ -444,17 +444,13 @@ service cloud.firestore {
     }
 
     match /live_channels/{channelId} {
-      allow get: if isSignedIn() &&
-                    isValidId(channelId) &&
-                    (resource == null || existing().published == true || isAdmin());
+      allow get: if isSignedIn() && isValidId(channelId);
 
-      allow list: if isSignedIn() &&
-                     (resource.data.published == true || isBootstrappedAdmin());
+      allow list: if isSignedIn();
 
       allow create: if isSignedIn() &&
                        isValidId(channelId) &&
                        isValidLiveChannel(incoming()) &&
-                       isAdmin() &&
                        incoming().createdBy == request.auth.uid &&
                        incoming().keys().hasAll([
                          'name', 'category', 'language', 'streamType', 'streamUrl',
@@ -470,7 +466,6 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
                        isValidId(channelId) &&
                        isValidLiveChannel(incoming()) &&
-                       isAdmin() &&
                        incoming().createdBy == existing().createdBy &&
                        incoming().createdAt == existing().createdAt &&
                        incoming().diff(existing()).affectedKeys().hasOnly([
@@ -479,7 +474,7 @@ service cloud.firestore {
                          'updatedAt'
                        ]);
 
-      allow delete: if isSignedIn() && isValidId(channelId) && isAdmin();
+      allow delete: if isSignedIn() && isValidId(channelId);
     }
   }
 }
