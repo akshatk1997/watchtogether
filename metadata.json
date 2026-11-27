@@ -1,0 +1,6 @@
+{
+  "name": "WatchTogether",
+  "description": "Synchronized watch party app for Android with YouTube, Google Drive, and free Indian Live TV playback, real-time room sync, live chat, emoji reactions, and voice chat controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

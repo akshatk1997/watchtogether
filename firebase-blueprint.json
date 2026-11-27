@@ -1,0 +1,388 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile and WatchTogether app preferences.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID matching the document ID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Watch party display nickname (1-40 chars)."
+        },
+        "avatarColorHex": {
+          "type": "string",
+          "description": "7-character hex color for user avatar badge."
+        },
+        "darkThemeEnabled": {
+          "type": "boolean",
+          "description": "Whether dark cinematic theme is active."
+        },
+        "autoSyncEnabled": {
+          "type": "boolean",
+          "description": "Whether automatic playback drift correction is active."
+        },
+        "hapticsEnabled": {
+          "type": "boolean",
+          "description": "Whether subtle haptic feedback is active."
+        },
+        "liveKitUrl": {
+          "type": "string",
+          "description": "Optional self-hosted LiveKit WebRTC server URL."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "avatarColorHex",
+        "darkThemeEnabled",
+        "autoSyncEnabled",
+        "hapticsEnabled",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WatchRoom": {
+      "title": "WatchRoom",
+      "description": "Synchronized watch party room keyed by unique 6-character uppercase room code.",
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "description": "UID of the room host (immutable)."
+        },
+        "hostName": {
+          "type": "string",
+          "description": "Display name of the host (1-40 chars)."
+        },
+        "title": {
+          "type": "string",
+          "description": "Watch party room title (1-80 chars)."
+        },
+        "sourceType": {
+          "type": "string",
+          "enum": ["YOUTUBE", "LIVE_TV", "DRIVE", "DIRECT_VIDEO"],
+          "description": "Active media content source."
+        },
+        "mediaUrl": {
+          "type": "string",
+          "description": "YouTube video ID/URL, HLS stream URL, Drive preview URL, or direct video URL."
+        },
+        "mediaTitle": {
+          "type": "string",
+          "description": "Display title of the active media."
+        },
+        "mediaThumbnail": {
+          "type": "string",
+          "description": "Optional thumbnail URL of the active media."
+        },
+        "playbackState": {
+          "type": "string",
+          "enum": ["PLAYING", "PAUSED", "BUFFERING"],
+          "description": "Authoritative room playback state."
+        },
+        "positionMs": {
+          "type": "integer",
+          "description": "Authoritative playback position in milliseconds at syncUpdatedAt."
+        },
+        "playbackRate": {
+          "type": "number",
+          "description": "Playback rate multiplier between 0.25 and 2.0."
+        },
+        "everyoneCanControl": {
+          "type": "boolean",
+          "description": "Whether guests can also control playback and pick media."
+        },
+        "roomLocked": {
+          "type": "boolean",
+          "description": "Whether new guests are blocked from joining."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "ENDED"],
+          "description": "Lifecycle status of the watch room."
+        },
+        "memberUids": {
+          "type": "array",
+          "description": "Bounded list (max 30) of active room participant UIDs."
+        },
+        "kickedUids": {
+          "type": "array",
+          "description": "Bounded list (max 30) of kicked UIDs blocked from rejoining."
+        },
+        "mutedUids": {
+          "type": "array",
+          "description": "Bounded list (max 30) of chat/voice muted participant UIDs."
+        },
+        "syncUpdatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last playback sync action via FieldValue.serverTimestamp()."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "hostId",
+        "hostName",
+        "title",
+        "sourceType",
+        "mediaUrl",
+        "mediaTitle",
+        "playbackState",
+        "positionMs",
+        "playbackRate",
+        "everyoneCanControl",
+        "roomLocked",
+        "status",
+        "memberUids",
+        "kickedUids",
+        "mutedUids",
+        "syncUpdatedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "RoomParticipant": {
+      "title": "RoomParticipant",
+      "description": "Live presence, typing, and voice chat indicator for a member in a watch room.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Participant UID matching the document ID."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Participant display name (1-40 chars)."
+        },
+        "avatarColorHex": {
+          "type": "string",
+          "description": "7-character hex color for avatar."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["HOST", "GUEST"],
+          "description": "Participant role in the room."
+        },
+        "typing": {
+          "type": "boolean",
+          "description": "Whether the participant is currently typing in chat."
+        },
+        "micMuted": {
+          "type": "boolean",
+          "description": "Whether the participant microphone is muted."
+        },
+        "speaking": {
+          "type": "boolean",
+          "description": "Whether active microphone speech is currently detected."
+        },
+        "voiceJoined": {
+          "type": "boolean",
+          "description": "Whether the participant has joined the room voice channel."
+        },
+        "joinedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "avatarColorHex",
+        "role",
+        "typing",
+        "micMuted",
+        "speaking",
+        "voiceJoined",
+        "joinedAt",
+        "updatedAt"
+      ]
+    },
+    "RoomMessage": {
+      "title": "RoomMessage",
+      "description": "Live chat message or floating emoji reaction inside a watch room.",
+      "type": "object",
+      "properties": {
+        "senderId": {
+          "type": "string",
+          "description": "UID of the message sender."
+        },
+        "senderName": {
+          "type": "string",
+          "description": "Display name of the sender (1-40 chars)."
+        },
+        "senderColorHex": {
+          "type": "string",
+          "description": "7-character hex color for sender badge."
+        },
+        "text": {
+          "type": "string",
+          "description": "Message body or reaction emoji (1-400 chars)."
+        },
+        "messageType": {
+          "type": "string",
+          "enum": ["TEXT", "SYSTEM", "REACTION"],
+          "description": "Type of chat entry."
+        },
+        "memberUids": {
+          "type": "array",
+          "description": "Denormalized bounded list (max 30) of room member UIDs for secure list queries."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "senderId",
+        "senderName",
+        "senderColorHex",
+        "text",
+        "messageType",
+        "memberUids",
+        "createdAt"
+      ]
+    },
+    "LiveChannel": {
+      "title": "LiveChannel",
+      "description": "Curated free legal Indian Live TV channel with health check status.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Channel display name (1-60 chars)."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["NEWS", "ENTERTAINMENT", "MUSIC", "REGIONAL", "KIDS", "DEVOTIONAL"],
+          "description": "Channel genre category."
+        },
+        "language": {
+          "type": "string",
+          "description": "Broadcast language (1-30 chars)."
+        },
+        "streamType": {
+          "type": "string",
+          "enum": ["HLS", "YOUTUBE_LIVE"],
+          "description": "Transport format for playback."
+        },
+        "streamUrl": {
+          "type": "string",
+          "description": "Official free HLS URL or YouTube Live video/channel ID."
+        },
+        "broadcaster": {
+          "type": "string",
+          "description": "Official broadcaster attribution (1-60 chars)."
+        },
+        "badgeColorHex": {
+          "type": "string",
+          "description": "7-character hex color for channel visual accent."
+        },
+        "published": {
+          "type": "boolean",
+          "description": "Whether the channel is visible to users (false hides dead streams)."
+        },
+        "healthStatus": {
+          "type": "string",
+          "enum": ["ONLINE", "DEGRADED", "OFFLINE", "UNKNOWN"],
+          "description": "Latest stream health check result."
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of admin who added the channel."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp()."
+        }
+      },
+      "required": [
+        "name",
+        "category",
+        "language",
+        "streamType",
+        "streamUrl",
+        "broadcaster",
+        "badgeColorHex",
+        "published",
+        "healthStatus",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Server-managed administrator grant document.",
+      "type": "object",
+      "properties": {
+        "grantedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when admin privilege was granted."
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile and WatchTogether preferences."
+    },
+    "/rooms/{roomCode}": {
+      "schema": { "$ref": "#/entities/WatchRoom" },
+      "description": "Synchronized watch party rooms keyed by 6-character room code."
+    },
+    "/rooms/{roomCode}/participants/{participantUid}": {
+      "schema": { "$ref": "#/entities/RoomParticipant" },
+      "description": "Live participant presence, typing indicator, and voice activity state."
+    },
+    "/rooms/{roomCode}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/RoomMessage" },
+      "description": "Live watch party chat messages and floating emoji reactions."
+    },
+    "/live_channels/{channelId}": {
+      "schema": { "$ref": "#/entities/LiveChannel" },
+      "description": "Curated free legal Indian Live TV catalog with health status."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted admin lookup table (non-writable by client SDKs)."
+    }
+  }
+}

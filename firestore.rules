@@ -1,0 +1,485 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all reads and writes by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HARDENED HELPERS ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidRoomCode(code) {
+      return code is string && code.matches('^[A-Z0-9]{6}$');
+    }
+
+    function isValidHexColor(hex) {
+      return hex is string && hex.size() == 7 && hex.matches('^#[0-9A-Fa-f]{6}$');
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isBoundedStringList(arr, minLen, maxLen) {
+      return arr is list &&
+             arr.size() >= minLen &&
+             arr.size() <= maxLen &&
+             (arr.size() == 0 || arr[0] is string);
+    }
+
+    // Bootstrapped admin (token-only, zero DB reads, safe for list rules; verifies email_verified)
+    function isBootstrappedAdmin() {
+      return isSignedIn() &&
+             'email_verified' in request.auth.token &&
+             request.auth.token.email_verified == true &&
+             'email' in request.auth.token &&
+             request.auth.token.email == 'uljhasawal@gmail.com';
+    }
+
+    // Full admin check for single-document operations
+    function isAdmin() {
+      return isBootstrappedAdmin() ||
+             (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    function roomPath(roomCode) {
+      return /databases/$(database)/documents/rooms/$(roomCode);
+    }
+
+    function isRoomMember(roomCode) {
+      return exists(roomPath(roomCode)) &&
+             request.auth.uid in get(roomPath(roomCode)).data.memberUids &&
+             !(request.auth.uid in get(roomPath(roomCode)).data.kickedUids);
+    }
+
+    function isRoomHost(roomCode) {
+      return exists(roomPath(roomCode)) &&
+             get(roomPath(roomCode)).data.hostId == request.auth.uid;
+    }
+
+    function isRoomMemberNotMuted(roomCode) {
+      return exists(roomPath(roomCode)) &&
+             get(roomPath(roomCode)).data.status == 'ACTIVE' &&
+             request.auth.uid in get(roomPath(roomCode)).data.memberUids &&
+             !(request.auth.uid in get(roomPath(roomCode)).data.kickedUids) &&
+             !(request.auth.uid in get(roomPath(roomCode)).data.mutedUids);
+    }
+
+    // --- ENTITY VALIDATION BLUEPRINTS ---
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 40 &&
+             isValidHexColor(data.avatarColorHex) &&
+             data.darkThemeEnabled is bool &&
+             data.autoSyncEnabled is bool &&
+             data.hapticsEnabled is bool &&
+             (!('liveKitUrl' in data) || (data.liveKitUrl is string && data.liveKitUrl.size() <= 300)) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidRoom(data) {
+      return data.hostId is string && data.hostId.size() >= 1 && data.hostId.size() <= 128 &&
+             data.hostName is string && data.hostName.size() >= 1 && data.hostName.size() <= 40 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 80 &&
+             data.sourceType is string && data.sourceType in ['YOUTUBE', 'LIVE_TV', 'DRIVE', 'DIRECT_VIDEO'] &&
+             data.mediaUrl is string && data.mediaUrl.size() <= 1000 &&
+             data.mediaTitle is string && data.mediaTitle.size() <= 120 &&
+             (!('mediaThumbnail' in data) || (data.mediaThumbnail is string && data.mediaThumbnail.size() <= 500)) &&
+             data.playbackState is string && data.playbackState in ['PLAYING', 'PAUSED', 'BUFFERING'] &&
+             data.positionMs is int && data.positionMs >= 0 && data.positionMs <= 86400000 &&
+             data.playbackRate is number && data.playbackRate >= 0.25 && data.playbackRate <= 2.0 &&
+             data.everyoneCanControl is bool &&
+             data.roomLocked is bool &&
+             (!('waitForEveryone' in data) || data.waitForEveryone is bool) &&
+             data.status is string && data.status in ['ACTIVE', 'ENDED'] &&
+             isBoundedStringList(data.memberUids, 1, 30) &&
+             isBoundedStringList(data.kickedUids, 0, 30) &&
+             isBoundedStringList(data.mutedUids, 0, 30) &&
+             isValidTimestamp(data.syncUpdatedAt) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidQueueItem(data) {
+      return data.videoId is string && data.videoId.size() == 11 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.channelName is string && data.channelName.size() <= 60 &&
+             data.thumbnailUrl is string && data.thumbnailUrl.size() <= 500 &&
+             data.suggestedByUid is string && data.suggestedByUid.size() >= 1 && data.suggestedByUid.size() <= 128 &&
+             data.suggestedByName is string && data.suggestedByName.size() >= 1 && data.suggestedByName.size() <= 40 &&
+             data.approved is bool &&
+             data.orderIndex is int && data.orderIndex >= 0 && data.orderIndex <= 1000000 &&
+             isBoundedStringList(data.memberUids, 1, 30) &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidParticipant(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 40 &&
+             isValidHexColor(data.avatarColorHex) &&
+             data.role is string && data.role in ['HOST', 'GUEST'] &&
+             data.typing is bool &&
+             data.micMuted is bool &&
+             data.speaking is bool &&
+             data.voiceJoined is bool &&
+             isValidTimestamp(data.joinedAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidMessage(data) {
+      return data.senderId is string && data.senderId.size() >= 1 && data.senderId.size() <= 128 &&
+             data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 40 &&
+             isValidHexColor(data.senderColorHex) &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 400 &&
+             data.messageType is string && data.messageType in ['TEXT', 'SYSTEM', 'REACTION'] &&
+             isBoundedStringList(data.memberUids, 1, 30) &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidLiveChannel(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 60 &&
+             data.category is string && data.category in ['NEWS', 'ENTERTAINMENT', 'MUSIC', 'REGIONAL', 'KIDS', 'DEVOTIONAL'] &&
+             data.language is string && data.language.size() >= 1 && data.language.size() <= 30 &&
+             data.streamType is string && data.streamType in ['HLS', 'YOUTUBE_LIVE'] &&
+             data.streamUrl is string && data.streamUrl.size() >= 1 && data.streamUrl.size() <= 1000 &&
+             data.broadcaster is string && data.broadcaster.size() >= 1 && data.broadcaster.size() <= 60 &&
+             isValidHexColor(data.badgeColorHex) &&
+             data.published is bool &&
+             data.healthStatus is string && data.healthStatus in ['ONLINE', 'DEGRADED', 'OFFLINE', 'UNKNOWN'] &&
+             data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    // --- ROOM UPDATE ACTION PREDICATES ---
+
+    function isHostRoomUpdate() {
+      return request.auth.uid == existing().hostId &&
+             incoming().diff(existing()).affectedKeys().hasOnly([
+               'title', 'sourceType', 'mediaUrl', 'mediaTitle', 'mediaThumbnail',
+               'playbackState', 'positionMs', 'playbackRate',
+               'everyoneCanControl', 'roomLocked', 'waitForEveryone', 'status',
+               'memberUids', 'kickedUids', 'mutedUids',
+               'syncUpdatedAt', 'updatedAt'
+             ]);
+    }
+
+    function isGuestJoinUpdate() {
+      return !existing().roomLocked &&
+             !(request.auth.uid in existing().kickedUids) &&
+             !(request.auth.uid in existing().memberUids) &&
+             incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'updatedAt']) &&
+             incoming().memberUids.hasAll(existing().memberUids) &&
+             request.auth.uid in incoming().memberUids &&
+             incoming().memberUids.size() == existing().memberUids.size() + 1;
+    }
+
+    function isGuestLeaveUpdate() {
+      return request.auth.uid != existing().hostId &&
+             (request.auth.uid in existing().memberUids) &&
+             !(request.auth.uid in incoming().memberUids) &&
+             incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'updatedAt']) &&
+             existing().memberUids.hasAll(incoming().memberUids) &&
+             incoming().memberUids.size() == existing().memberUids.size() - 1;
+    }
+
+    function isGuestSharedPlaybackUpdate() {
+      return existing().everyoneCanControl == true &&
+             request.auth.uid in existing().memberUids &&
+             !(request.auth.uid in existing().kickedUids) &&
+             incoming().diff(existing()).affectedKeys().hasOnly([
+               'sourceType', 'mediaUrl', 'mediaTitle', 'mediaThumbnail',
+               'playbackState', 'positionMs', 'playbackRate',
+               'syncUpdatedAt', 'updatedAt'
+             ]);
+    }
+
+    // --- COLLECTION RULES ---
+
+    match /admins/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list, create, update, delete: if false;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if false;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'avatarColorHex',
+                         'darkThemeEnabled', 'autoSyncEnabled', 'hapticsEnabled',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'avatarColorHex',
+                         'darkThemeEnabled', 'autoSyncEnabled', 'hapticsEnabled',
+                         'liveKitUrl', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'displayName', 'avatarColorHex',
+                         'darkThemeEnabled', 'autoSyncEnabled', 'hapticsEnabled',
+                         'liveKitUrl', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    match /rooms/{roomCode} {
+      allow get: if isSignedIn() &&
+                    isValidRoomCode(roomCode) &&
+                    (resource == null || !(request.auth.uid in existing().kickedUids) || isAdmin());
+
+      allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+
+      allow create: if isSignedIn() &&
+                       isValidRoomCode(roomCode) &&
+                       incoming().hostId == request.auth.uid &&
+                       incoming().status == 'ACTIVE' &&
+                       incoming().memberUids == [request.auth.uid] &&
+                       incoming().kickedUids.size() == 0 &&
+                       incoming().mutedUids.size() == 0 &&
+                       incoming().keys().hasAll([
+                         'hostId', 'hostName', 'title', 'sourceType', 'mediaUrl', 'mediaTitle',
+                         'playbackState', 'positionMs', 'playbackRate',
+                         'everyoneCanControl', 'roomLocked', 'status',
+                         'memberUids', 'kickedUids', 'mutedUids',
+                         'syncUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'hostId', 'hostName', 'title', 'sourceType', 'mediaUrl', 'mediaTitle',
+                         'mediaThumbnail', 'playbackState', 'positionMs', 'playbackRate',
+                         'everyoneCanControl', 'roomLocked', 'waitForEveryone', 'status',
+                         'memberUids', 'kickedUids', 'mutedUids',
+                         'syncUpdatedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidRoom(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidRoomCode(roomCode) &&
+                       isValidRoom(incoming()) &&
+                       (
+                         isAdmin() ||
+                         (
+                           existing().status == 'ACTIVE' &&
+                           incoming().hostId == existing().hostId &&
+                           incoming().createdAt == existing().createdAt &&
+                           (
+                             isHostRoomUpdate() ||
+                             isGuestJoinUpdate() ||
+                             isGuestLeaveUpdate() ||
+                             isGuestSharedPlaybackUpdate()
+                           )
+                         )
+                       );
+
+      allow delete: if isSignedIn() &&
+                       isValidRoomCode(roomCode) &&
+                       (existing().hostId == request.auth.uid || isAdmin());
+
+      match /participants/{participantUid} {
+        allow get: if isSignedIn() &&
+                      isValidRoomCode(roomCode) &&
+                      isValidId(participantUid) &&
+                      (request.auth.uid == participantUid || isRoomMember(roomCode) || isAdmin());
+
+        allow list: if false;
+
+        allow create: if isSignedIn() &&
+                         isValidRoomCode(roomCode) &&
+                         isValidId(participantUid) &&
+                         request.auth.uid == participantUid &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll([
+                           'userId', 'displayName', 'avatarColorHex', 'role',
+                           'typing', 'micMuted', 'speaking', 'voiceJoined',
+                           'joinedAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'displayName', 'avatarColorHex', 'role',
+                           'typing', 'micMuted', 'speaking', 'voiceJoined',
+                           'joinedAt', 'updatedAt'
+                         ]) &&
+                         isValidParticipant(incoming()) &&
+                         isRoomMember(roomCode) &&
+                         ((incoming().role == 'HOST' && isRoomHost(roomCode)) ||
+                          (incoming().role == 'GUEST' && !isRoomHost(roomCode)));
+
+        allow update: if isSignedIn() &&
+                         isValidRoomCode(roomCode) &&
+                         isValidId(participantUid) &&
+                         isValidParticipant(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().role == existing().role &&
+                         incoming().joinedAt == existing().joinedAt &&
+                         (
+                           (
+                             request.auth.uid == participantUid &&
+                             isRoomMember(roomCode) &&
+                             incoming().diff(existing()).affectedKeys().hasOnly([
+                               'displayName', 'avatarColorHex', 'typing',
+                               'micMuted', 'speaking', 'voiceJoined', 'updatedAt'
+                             ])
+                           ) ||
+                           (
+                             isRoomHost(roomCode) &&
+                             incoming().diff(existing()).affectedKeys().hasOnly([
+                               'micMuted', 'speaking', 'voiceJoined', 'updatedAt'
+                             ])
+                           )
+                         );
+
+        allow delete: if isSignedIn() &&
+                         isValidRoomCode(roomCode) &&
+                         isValidId(participantUid) &&
+                         (request.auth.uid == participantUid || isRoomHost(roomCode) || isAdmin());
+      }
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn() &&
+                      isValidRoomCode(roomCode) &&
+                      isValidId(messageId) &&
+                      (request.auth.uid in existing().memberUids || isAdmin());
+
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidRoomCode(roomCode) &&
+                         isValidId(messageId) &&
+                         incoming().senderId == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().keys().hasAll([
+                           'senderId', 'senderName', 'senderColorHex',
+                           'text', 'messageType', 'memberUids', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'senderId', 'senderName', 'senderColorHex',
+                           'text', 'messageType', 'memberUids', 'createdAt'
+                         ]) &&
+                         isValidMessage(incoming()) &&
+                         isRoomMemberNotMuted(roomCode);
+
+        allow update: if false;
+
+        allow delete: if isSignedIn() &&
+                         isValidRoomCode(roomCode) &&
+                         isValidId(messageId) &&
+                         (existing().senderId == request.auth.uid || isRoomHost(roomCode) || isAdmin());
+      }
+
+      match /queue/{itemId} {
+        allow get: if isSignedIn() &&
+                      isValidRoomCode(roomCode) &&
+                      isValidId(itemId) &&
+                      (request.auth.uid in existing().memberUids || isAdmin());
+
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidRoomCode(roomCode) &&
+                         isValidId(itemId) &&
+                         incoming().suggestedByUid == request.auth.uid &&
+                         request.auth.uid in incoming().memberUids &&
+                         (incoming().approved == false || isRoomHost(roomCode)) &&
+                         incoming().keys().hasAll([
+                           'videoId', 'title', 'channelName', 'thumbnailUrl',
+                           'suggestedByUid', 'suggestedByName', 'approved',
+                           'orderIndex', 'memberUids', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'videoId', 'title', 'channelName', 'thumbnailUrl',
+                           'suggestedByUid', 'suggestedByName', 'approved',
+                           'orderIndex', 'memberUids', 'createdAt'
+                         ]) &&
+                         isValidQueueItem(incoming()) &&
+                         isRoomMemberNotMuted(roomCode);
+
+        allow update: if isSignedIn() &&
+                         isValidRoomCode(roomCode) &&
+                         isValidId(itemId) &&
+                         isValidQueueItem(incoming()) &&
+                         incoming().suggestedByUid == existing().suggestedByUid &&
+                         incoming().videoId == existing().videoId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isRoomHost(roomCode) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'approved', 'orderIndex', 'memberUids'
+                         ]);
+
+        allow delete: if isSignedIn() &&
+                         isValidRoomCode(roomCode) &&
+                         isValidId(itemId) &&
+                         (existing().suggestedByUid == request.auth.uid || isRoomHost(roomCode) || isAdmin());
+      }
+    }
+
+    match /live_channels/{channelId} {
+      allow get: if isSignedIn() &&
+                    isValidId(channelId) &&
+                    (resource == null || existing().published == true || isAdmin());
+
+      allow list: if isSignedIn() &&
+                     (resource.data.published == true || isBootstrappedAdmin());
+
+      allow create: if isSignedIn() &&
+                       isValidId(channelId) &&
+                       isValidLiveChannel(incoming()) &&
+                       isAdmin() &&
+                       incoming().createdBy == request.auth.uid &&
+                       incoming().keys().hasAll([
+                         'name', 'category', 'language', 'streamType', 'streamUrl',
+                         'broadcaster', 'badgeColorHex', 'published', 'healthStatus',
+                         'createdBy', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'name', 'category', 'language', 'streamType', 'streamUrl',
+                         'broadcaster', 'badgeColorHex', 'published', 'healthStatus',
+                         'createdBy', 'createdAt', 'updatedAt'
+                       ]);
+
+      allow update: if isSignedIn() &&
+                       isValidId(channelId) &&
+                       isValidLiveChannel(incoming()) &&
+                       isAdmin() &&
+                       incoming().createdBy == existing().createdBy &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'name', 'category', 'language', 'streamType', 'streamUrl',
+                         'broadcaster', 'badgeColorHex', 'published', 'healthStatus',
+                         'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(channelId) && isAdmin();
+    }
+  }
+}
