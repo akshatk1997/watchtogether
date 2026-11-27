@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WatchTogether — Cinema nights, synced to the millisecond</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Auth View -->
+    <section id="auth-view" class="view active">
+      <div class="auth-card glass">
+        <div class="brand-row">
+          <div class="logo-circle">▶</div>
+          <div>
+            <h1>WatchTogether</h1>
+            <p class="subtitle">Cinema nights, synced to the millisecond.</p>
+          </div>
+        </div>
+
+        <p class="auth-desc">
+          Sign in with Google (optional), use Email &amp; Password, or continue as a Guest to create and join synced watch parties across Android &amp; Web.
+        </p>
+
+        <div id="auth-error" class="error-banner hidden"></div>
+
+        <button id="btn-google" class="btn btn-primary full-width">Sign in with Google</button>
+        <button id="btn-guest" class="btn btn-outline full-width">Continue as Guest</button>
+
+        <button id="btn-toggle-email" class="btn-link">Sign in with Email &amp; Password</button>
+
+        <form id="email-form" class="email-form hidden">
+          <input id="email-input" type="email" placeholder="Email" required />
+          <input id="password-input" type="password" placeholder="Password (min 6 chars)" minlength="6" required />
+          <button id="btn-email-submit" type="submit" class="btn btn-primary full-width">Sign In with Email</button>
+          <button id="btn-email-mode" type="button" class="btn-link small">New here? Create an account</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Home / Lobby View -->
+    <section id="home-view" class="view">
+      <header class="topbar glass">
+        <div class="brand-mini">
+          <span class="logo-dot">▶</span>
+          <strong>WatchTogether</strong>
+        </div>
+        <div class="user-bar">
+          <span id="user-badge" class="badge">Guest</span>
+          <button id="btn-signout" class="btn btn-outline btn-sm">Sign Out</button>
+        </div>
+      </header>
+
+      <main class="lobby-grid">
+        <div class="glass card">
+          <h2>Create a Watch Party</h2>
+          <p class="muted">Start a synced room and share the 6-character code with friends on Android or Web.</p>
+          <input id="create-room-name" type="text" placeholder="Room name (e.g. Friday Movie Night)" />
+          <input id="create-media-url" type="url" placeholder="YouTube, Drive, or HLS (.m3u8) URL (optional)" />
+          <button id="btn-create-room" class="btn btn-primary full-width">Create Room</button>
+        </div>
+
+        <div class="glass card">
+          <h2>Join a Room</h2>
+          <p class="muted">Enter a 6-character room code to jump straight into an active watch party.</p>
+          <input id="join-room-code" type="text" maxlength="6" placeholder="ROOM CODE (e.g. A1B2C3)" class="mono upper" />
+          <button id="btn-join-room" class="btn btn-primary full-width">Join Room</button>
+        </div>
+      </main>
+    </section>
+
+    <!-- Room View -->
+    <section id="room-view" class="view">
+      <header class="topbar glass">
+        <div class="room-info">
+          <button id="btn-leave-room" class="btn btn-outline btn-sm">← Leave</button>
+          <strong id="room-title">Watch Party</strong>
+          <span id="room-code-pill" class="badge mono">------</span>
+          <button id="btn-copy-link" class="btn btn-outline btn-sm">Copy Invite</button>
+        </div>
+        <span id="sync-status" class="muted small">Synced</span>
+      </header>
+
+      <div class="room-layout">
+        <div class="player-col">
+          <div class="player-box glass">
+            <div id="yt-player"></div>
+            <video id="hls-player" controls playsinline class="hidden"></video>
+            <iframe id="drive-player" class="hidden" allow="autoplay; fullscreen"></iframe>
+            <div id="empty-player" class="empty-player">
+              <p>No video loaded yet. Paste a YouTube, Google Drive, or HLS (.m3u8) URL below.</p>
+            </div>
+          </div>
+
+          <div class="controls-bar glass">
+            <input id="room-media-url" type="url" placeholder="Paste YouTube, Drive, or HLS (.m3u8) URL..." />
+            <button id="btn-load-media" class="btn btn-primary btn-sm">Load</button>
+            <button id="btn-play-pause" class="btn btn-outline btn-sm">Play / Pause</button>
+          </div>
+        </div>
+
+        <aside class="chat-col glass">
+          <h3>Live Chat</h3>
+          <div id="chat-messages" class="chat-messages"></div>
+          <form id="chat-form" class="chat-form">
+            <input id="chat-input" type="text" placeholder="Say something..." required />
+            <button type="submit" class="btn btn-primary btn-sm">Send</button>
+          </form>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
