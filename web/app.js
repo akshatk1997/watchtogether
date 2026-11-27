@@ -46,6 +46,8 @@ let isEmailSignUp = false;
 let activeRoomCode = null;
 let unsubRoom = null;
 let unsubChat = null;
+let unsubQueue = null;
+let unsubReactions = null;
 let ytPlayer = null;
 let hlsInstance = null;
 let currentMediaUrl = "";
@@ -209,6 +211,32 @@ document.getElementById("btn-join-room").addEventListener("click", () => {
   if (code.length === 6) joinRoom(code);
 });
 
+document.querySelectorAll(".livetv-btn").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const code = generateCode();
+    const name = btn.dataset.name || "Live TV";
+    const mediaUrl = btn.dataset.url || "";
+    try {
+      await setDoc(doc(db, "rooms", code), {
+        roomCode: code,
+        name,
+        hostId: currentUid,
+        memberUids: [currentUid],
+        kickedUids: [],
+        mediaUrl,
+        mediaType: "HLS",
+        isPlaying: true,
+        positionMs: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      joinRoom(code);
+    } catch (err) {
+      alert("Could not start Live TV room: " + err.message);
+    }
+  });
+});
+
 async function joinRoom(code) {
   activeRoomCode = code;
   document.getElementById("room-code-pill").textContent = code;
@@ -248,11 +276,63 @@ async function joinRoom(code) {
     });
     box.scrollTop = box.scrollHeight;
   });
+
+  if (unsubQueue) unsubQueue();
+  const queueQ = query(collection(db, "rooms", code, "queue"), orderBy("addedAt", "asc"), limit(30));
+  unsubQueue = onSnapshot(queueQ, (snap) => {
+    const qList = document.getElementById("queue-list");
+    qList.innerHTML = "";
+    snap.forEach((d) => {
+      const item = d.data();
+      const div = document.createElement("div");
+      div.className = "queue-item";
+      div.innerHTML = `<span class="small">${escapeHtml(item.url || "")}</span><button class="btn btn-outline btn-sm">Play</button>`;
+      div.querySelector("button").addEventListener("click", async () => {
+        const media = detectMedia(item.url || "");
+        await updateDoc(doc(db, "rooms", code), {
+          mediaUrl: item.url,
+          mediaType: media.type,
+          positionMs: 0,
+          isPlaying: true,
+          updatedAt: serverTimestamp()
+        });
+      });
+      qList.appendChild(div);
+    });
+  });
+
+  if (unsubReactions) unsubReactions();
+  let initialReactionsLoaded = false;
+  const reactQ = query(collection(db, "rooms", code, "reactions"), orderBy("timestamp", "desc"), limit(10));
+  unsubReactions = onSnapshot(reactQ, (snap) => {
+    if (!initialReactionsLoaded) {
+      initialReactionsLoaded = true;
+      return;
+    }
+    snap.docChanges().forEach((change) => {
+      if (change.type === "added") {
+        spawnFloatingEmoji(change.doc.data().emoji || "❤️");
+      }
+    });
+  });
+}
+
+function spawnFloatingEmoji(emoji) {
+  const overlay = document.getElementById("reactions-overlay");
+  if (!overlay) return;
+  const el = document.createElement("div");
+  el.className = "floating-emoji";
+  el.textContent = emoji;
+  el.style.left = `${15 + Math.random() * 70}%`;
+  overlay.appendChild(el);
+  setTimeout(() => el.remove(), 2200);
 }
 
 function leaveRoom() {
   if (unsubRoom) { unsubRoom(); unsubRoom = null; }
   if (unsubChat) { unsubChat(); unsubChat = null; }
+  if (unsubQueue) { unsubQueue(); unsubQueue = null; }
+  if (unsubReactions) { unsubReactions(); unsubReactions = null; }
   activeRoomCode = null;
   currentMediaUrl = "";
   showView(homeView);
@@ -298,6 +378,43 @@ document.getElementById("chat-form").addEventListener("submit", async (e) => {
     senderName: currentName,
     text,
     timestamp: serverTimestamp()
+  });
+});
+
+document.querySelectorAll(".react-btn").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    if (!activeRoomCode) return;
+    await addDoc(collection(db, "rooms", activeRoomCode, "reactions"), {
+      emoji: btn.dataset.emoji || "❤️",
+      senderId: currentUid,
+      timestamp: serverTimestamp()
+    });
+  });
+});
+
+const tabChat = document.getElementById("tab-chat");
+const tabQueue = document.getElementById("tab-queue");
+const panelChat = document.getElementById("panel-chat");
+const panelQueue = document.getElementById("panel-queue");
+tabChat.addEventListener("click", () => {
+  tabChat.classList.add("active"); tabQueue.classList.remove("active");
+  panelChat.classList.remove("hidden"); panelQueue.classList.add("hidden");
+});
+tabQueue.addEventListener("click", () => {
+  tabQueue.classList.add("active"); tabChat.classList.remove("active");
+  panelQueue.classList.remove("hidden"); panelChat.classList.add("hidden");
+});
+
+document.getElementById("queue-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("queue-url-input");
+  const url = input.value.trim();
+  if (!url || !activeRoomCode) return;
+  input.value = "";
+  await addDoc(collection(db, "rooms", activeRoomCode, "queue"), {
+    url,
+    addedBy: currentName,
+    addedAt: serverTimestamp()
   });
 });
 

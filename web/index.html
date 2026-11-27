@@ -71,6 +71,16 @@
           <input id="join-room-code" type="text" maxlength="6" placeholder="ROOM CODE (e.g. A1B2C3)" class="mono upper" />
           <button id="btn-join-room" class="btn btn-primary full-width">Join Room</button>
         </div>
+
+        <div class="glass card">
+          <h2>Free Live TV</h2>
+          <p class="muted">Start an instant synced watch party with official Indian HLS channels.</p>
+          <div class="livetv-list">
+            <button class="btn btn-outline full-width livetv-btn" data-name="DD News Live" data-url="https://d3eymg6802k102.cloudfront.net/ddnews/index.m3u8">📺 DD News Live</button>
+            <button class="btn btn-outline full-width livetv-btn" data-name="DD India Live" data-url="https://d3eymg6802k102.cloudfront.net/ddindia/index.m3u8">🌏 DD India Live</button>
+            <button class="btn btn-outline full-width livetv-btn" data-name="Sansad TV" data-url="https://d3eymg6802k102.cloudfront.net/sansadtv/index.m3u8">🏛️ Sansad TV</button>
+          </div>
+        </div>
       </main>
     </section>
 
@@ -95,6 +105,17 @@
             <div id="empty-player" class="empty-player">
               <p>No video loaded yet. Paste a YouTube, Google Drive, or HLS (.m3u8) URL below.</p>
             </div>
+            <div id="reactions-overlay" class="reactions-overlay"></div>
+          </div>
+
+          <div class="reactions-bar glass">
+            <span class="muted small">React:</span>
+            <button class="react-btn" data-emoji="❤️">❤️</button>
+            <button class="react-btn" data-emoji="😂">😂</button>
+            <button class="react-btn" data-emoji="🔥">🔥</button>
+            <button class="react-btn" data-emoji="👏">👏</button>
+            <button class="react-btn" data-emoji="🎉">🎉</button>
+            <button class="react-btn" data-emoji="😮">😮</button>
           </div>
 
           <div class="controls-bar glass">
@@ -105,12 +126,24 @@
         </div>
 
         <aside class="chat-col glass">
-          <h3>Live Chat</h3>
-          <div id="chat-messages" class="chat-messages"></div>
-          <form id="chat-form" class="chat-form">
-            <input id="chat-input" type="text" placeholder="Say something..." required />
-            <button type="submit" class="btn btn-primary btn-sm">Send</button>
-          </form>
+          <div class="side-tabs">
+            <button id="tab-chat" class="tab-btn active">Live Chat</button>
+            <button id="tab-queue" class="tab-btn">Queue</button>
+          </div>
+          <div id="panel-chat" class="side-panel">
+            <div id="chat-messages" class="chat-messages"></div>
+            <form id="chat-form" class="chat-form">
+              <input id="chat-input" type="text" placeholder="Say something..." required />
+              <button type="submit" class="btn btn-primary btn-sm">Send</button>
+            </form>
+          </div>
+          <div id="panel-queue" class="side-panel hidden">
+            <div id="queue-list" class="chat-messages"></div>
+            <form id="queue-form" class="chat-form">
+              <input id="queue-url-input" type="url" placeholder="Add YouTube/Drive/HLS URL..." required />
+              <button type="submit" class="btn btn-primary btn-sm">Add</button>
+            </form>
+          </div>
         </aside>
       </div>
     </section>
