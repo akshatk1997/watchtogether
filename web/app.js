@@ -227,6 +227,31 @@ document.getElementById("btn-join-room").addEventListener("click", () => {
   if (code.length === 6) joinRoom(code);
 });
 
+document.getElementById("btn-yt-quick").addEventListener("click", async () => {
+  const raw = document.getElementById("yt-quick-url").value.trim();
+  if (!raw) return;
+  const url = /^[a-zA-Z0-9_-]{11}$/.test(raw) ? `https://www.youtube.com/watch?v=${raw}` : raw;
+  const code = generateCode();
+  try {
+    await setDoc(doc(db, "rooms", code), {
+      roomCode: code,
+      name: "YouTube Party",
+      hostId: currentUid,
+      memberUids: [currentUid],
+      kickedUids: [],
+      mediaUrl: url,
+      mediaType: "YOUTUBE",
+      isPlaying: true,
+      positionMs: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    joinRoom(code);
+  } catch (err) {
+    alert("Could not start YouTube room: " + err.message);
+  }
+});
+
 document.querySelectorAll(".livetv-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
     const code = generateCode();
